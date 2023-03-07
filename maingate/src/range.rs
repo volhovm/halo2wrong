@@ -156,7 +156,7 @@ impl<F: FieldExt> RangeInstructions<F> for RangeChip<F> {
 
     fn load_table(&self, layouter: &mut impl Layouter<F>) -> Result<(), Error> {
         layouter.assign_table(
-            || "",
+            || "table",
             |mut table| {
                 let mut offset = 0;
 

@@ -79,7 +79,8 @@ impl<F: FieldExt> AssignedLimb<F> {
         self.value.value().map(|value| Limb::new(*value))
     }
 
-    fn max_val(&self) -> big_uint {
+    /// bla
+    pub fn max_val(&self) -> big_uint {
         self.max_val.clone()
     }
 
@@ -115,7 +116,7 @@ pub struct UnassignedInteger<
     N: FieldExt,
     const NUMBER_OF_LIMBS: usize,
     const BIT_LEN_LIMB: usize,
->(Value<Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>>);
+>(pub Value<Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>>);
 
 impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
     From<Value<Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>>>
@@ -175,7 +176,8 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         limbs.map(|limbs| Integer::new(limbs, Rc::clone(&self.rns)))
     }
 
-    fn make_aux(&self) -> Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
+    /// bla
+    pub fn make_aux(&self) -> Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB> {
         let mut max_shift = 0usize;
         let max_vals = self.max_vals();
         for (max_val, aux) in max_vals.iter().zip(self.rns.base_aux.iter()) {
@@ -201,7 +203,8 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
         )
     }
 
-    fn max_val(&self) -> big_uint {
+    /// bla
+    pub fn max_val(&self) -> big_uint {
         compose(self.max_vals().to_vec(), BIT_LEN_LIMB)
     }
 

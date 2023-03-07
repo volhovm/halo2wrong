@@ -124,8 +124,10 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
 /// Config for Ecc Chip
 #[derive(Clone, Debug)]
 pub struct EccConfig {
-    range_config: RangeConfig,
-    main_gate_config: MainGateConfig,
+    /// Range config
+    pub range_config: RangeConfig,
+    /// Main gate config
+    pub main_gate_config: MainGateConfig,
 }
 
 impl EccConfig {

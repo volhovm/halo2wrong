@@ -24,9 +24,9 @@ mod square;
 #[derive(Clone, Debug)]
 pub struct IntegerConfig {
     /// Configuration for [`RangeChip`]
-    range_config: RangeConfig,
+    pub range_config: RangeConfig,
     /// Configuration for [`MainGate`]
-    main_gate_config: MainGateConfig,
+    pub main_gate_config: MainGateConfig,
 }
 
 impl IntegerConfig {
@@ -59,7 +59,8 @@ pub struct IntegerChip<
 impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>
     IntegerChip<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
 {
-    fn sublimb_bit_len() -> usize {
+    /// bla
+    pub fn sublimb_bit_len() -> usize {
         let number_of_lookup_limbs = 4;
         assert!(BIT_LEN_LIMB % number_of_lookup_limbs == 0);
         BIT_LEN_LIMB / number_of_lookup_limbs
@@ -547,8 +548,17 @@ impl<W: FieldExt, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB:
     }
 }
 
+impl<W: FieldExt, N: FieldExt, const BIT_LEN_LIMB: usize, const NUMBER_OF_LIMBS: usize>
+    From<Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>>
+    for UnassignedInteger<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>
+{
+    fn from(integer: Integer<W, N, NUMBER_OF_LIMBS, BIT_LEN_LIMB>) -> Self {
+        UnassignedInteger(halo2::circuit::Value::known(integer))
+    }
+}
+
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::{IntegerChip, IntegerConfig, IntegerInstructions, Range};
     use crate::rns::{Common, Integer, Rns};
     use crate::{FieldExt, UnassignedInteger};

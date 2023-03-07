@@ -536,6 +536,9 @@ mod tests {
                     let offset = 0;
                     let ctx = &mut RegionCtx::new(region, offset);
 
+                    use integer::maingate::MainGateInstructions;
+                    &ecc_chip.main_gate().break_here(ctx);
+
                     let a = C::Curve::random(OsRng);
                     let b = C::Curve::random(OsRng);
 
