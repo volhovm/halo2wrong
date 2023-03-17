@@ -105,16 +105,17 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let d_v = a_v + a_v;
         let e_v = a_v + b_v + a_v;
 
-        let (a, b, c_0, d_0, e_0, offset1) = layouter.assign_region(
+        let mut offset = 0;
+        let (a, a_0, b, c_0, d_0, e_0, mut offset) = layouter.assign_region(
             || "assign variables",
             |region| {
-                let offset = 0;
                 let ctx = &mut RegionCtx::new(region, offset);
 
                 //use integer::maingate::MainGateInstructions;
                 //&ecc_chip.main_gate().break_here(ctx);
 
                 let a = &ecc_chip.assign_point(ctx, Value::known(a_v.into()))?;
+                let a_0 = &ecc_chip.assign_point(ctx, Value::known(a_v.into()))?;
                 let b = &ecc_chip.assign_point(ctx, Value::known(b_v.into()))?;
                 let c_0 = &ecc_chip.assign_point(ctx, Value::known(c_v.into()))?;
                 let d_0 = &ecc_chip.assign_point(ctx, Value::known(d_v.into()))?;
@@ -122,6 +123,7 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
                 Ok((
                     a.clone(),
+                    a_0.clone(),
                     b.clone(),
                     c_0.clone(),
                     d_0.clone(),
@@ -131,39 +133,69 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
             },
         )?;
 
-        let offset2 = layouter.assign_region(
+        offset = layouter.assign_region(
+            || "assert_equal",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, offset);
+
+                ecc_chip.assert_equal(ctx, &a, &a_0)?;
+
+                Ok(ctx.offset())
+            },
+        )?;
+
+        offset = layouter.assign_region(
+            || "assert_is_on_curve",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, offset);
+
+                ecc_chip.assert_is_on_curve(ctx, &a)?;
+
+                Ok(ctx.offset())
+            },
+        )?;
+
+        offset = layouter.assign_region(
+            || "neg",
+            |region| {
+                let ctx = &mut RegionCtx::new(region, offset);
+
+                let _a_neg = ecc_chip.neg(ctx, &a)?;
+
+                Ok(ctx.offset())
+            },
+        )?;
+
+        offset = layouter.assign_region(
             || "addition",
             |region| {
-                let ctx = &mut RegionCtx::new(region, offset1);
+                let ctx = &mut RegionCtx::new(region, offset);
 
-                let c_1 = &ecc_chip.add(ctx, &a, &b)?;
-                ecc_chip.assert_equal(ctx, &c_0, c_1)?;
+                let _c_1 = &ecc_chip.add(ctx, &a, &b)?;
 
                 Ok(ctx.offset())
             },
         )?;
 
-        let offset3 = layouter.assign_region(
+        offset = layouter.assign_region(
             || "doubling",
             |region| {
-                let ctx = &mut RegionCtx::new(region, offset2);
+                let ctx = &mut RegionCtx::new(region, offset);
 
-                let d_1 = &ecc_chip.double(ctx, &a)?;
-                ecc_chip.assert_equal(ctx, &d_0, d_1)?;
+                let _d_1 = &ecc_chip.double(ctx, &a)?;
 
                 Ok(ctx.offset())
             },
         )?;
 
-        let offset4 = layouter.assign_region(
+        offset = layouter.assign_region(
             || "ladder",
             |region| {
-                let ctx = &mut RegionCtx::new(region, offset3);
+                let ctx = &mut RegionCtx::new(region, offset);
 
                 //// test ladder
 
-                let e_1 = &ecc_chip.ladder(ctx, &a, &b)?;
-                ecc_chip.assert_equal(ctx, &e_0, e_1)?;
+                let _e_1 = &ecc_chip.ladder(ctx, &a, &b)?;
 
                 Ok(ctx.offset())
             },
@@ -197,19 +229,19 @@ pub fn measure_ecc_circuits() {
 
     use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq};
 
-    measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
-    measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
-    measure_addition::<PastaEp, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
+    measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
+    measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
+    measure_addition::<PastaEp, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
 
-    measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
-    measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
-    measure_addition::<PastaEq, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(12);
+    measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
+    measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
+    measure_addition::<PastaEq, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(20);
 
-    measure_addition::<PastaEp, Bn256, 4, 72>(12);
-    measure_addition::<PastaEp, Secp256k1, 4, 72>(12);
-    measure_addition::<PastaEp, Pallas, 4, 72>(12);
+    measure_addition::<PastaEp, Bn256, 4, 72>(20);
+    measure_addition::<PastaEp, Secp256k1, 4, 72>(20);
+    measure_addition::<PastaEp, Pallas, 4, 72>(20);
 
-    measure_addition::<PastaEq, Bn256, 4, 72>(12);
-    measure_addition::<PastaEq, Secp256k1, 4, 72>(12);
-    measure_addition::<PastaEq, Vesta, 4, 72>(12);
+    measure_addition::<PastaEq, Bn256, 4, 72>(20);
+    measure_addition::<PastaEq, Secp256k1, 4, 72>(20);
+    measure_addition::<PastaEq, Vesta, 4, 72>(20);
 }
