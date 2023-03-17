@@ -10,8 +10,10 @@ pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Deb
 ) where
     G::Scalar: FieldExt,
 {
+    //println!("{:?}", circuit);
+    println!("{}", std::any::type_name::<C>());
     let cost: CircuitCost<_, _> = CircuitCost::<G, C>::measure(k, circuit);
-    println!("{:?}", cost);
+    println!("  {:?}", cost.regions);
     //    println!("{:?}", cost.marginal_proof_size());
     //
     //    //println!("min rows: {}", circuit.minimum_rows());

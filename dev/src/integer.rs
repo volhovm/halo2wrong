@@ -472,17 +472,17 @@ pub fn measure_integer_circuits() {
         measure_circuit_size::<G, _>(&circuit, k);
     }
 
-    measure_addition::<PastaEq, PastaFq, 68>(6);
-    measure_addition::<PastaEq, PastaFp, 68>(6);
-    measure_addition::<PastaEq, BnBase, 68>(6);
-    measure_addition::<PastaEq, BnScalar, 68>(6);
-    measure_addition::<PastaEq, Secp256k1Base, 68>(6);
-    measure_addition::<PastaEq, Secp256k1Scalar, 68>(6);
+    measure_addition::<PastaEq, PastaFq, 68>(10);
+    measure_addition::<PastaEq, PastaFp, 68>(10);
+    measure_addition::<PastaEq, BnBase, 68>(10);
+    measure_addition::<PastaEq, BnScalar, 68>(10);
+    measure_addition::<PastaEq, Secp256k1Base, 68>(10);
+    measure_addition::<PastaEq, Secp256k1Scalar, 68>(10);
 
-    measure_addition::<PastaEp, PastaFq, 68>(6);
-    measure_addition::<PastaEp, PastaFp, 68>(6);
-    measure_addition::<PastaEp, BnBase, 68>(6);
-    measure_addition::<PastaEp, BnScalar, 68>(6);
-    measure_addition::<PastaEp, Secp256k1Base, 68>(6);
-    measure_addition::<PastaEp, Secp256k1Scalar, 68>(6);
+    measure_addition::<PastaEp, PastaFq, 68>(10);
+    measure_addition::<PastaEp, PastaFp, 68>(10);
+    measure_addition::<PastaEp, BnBase, 68>(10);
+    measure_addition::<PastaEp, BnScalar, 68>(10);
+    measure_addition::<PastaEp, Secp256k1Base, 68>(10);
+    measure_addition::<PastaEp, Secp256k1Scalar, 68>(10);
 }
