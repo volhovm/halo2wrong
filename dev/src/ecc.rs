@@ -12,7 +12,7 @@ use halo2::halo2curves::pasta::{EpAffine as Pallas, EqAffine as Vesta};
 use halo2::halo2curves::secp256k1::Secp256k1Affine as Secp256k1;
 use halo2::plonk::{Circuit, ConstraintSystem, Error};
 use integer::rns::Integer;
-use integer::{IntegerInstructions, Range, UnassignedInteger};
+use integer::{IntegerInstructions, Range};
 use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructions, RegionCtx};
 use rand_core::OsRng;
 use std::marker::PhantomData;
@@ -106,9 +106,6 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let aux_generator = C::Curve::random(OsRng).to_affine();
         let a_v = C::Curve::random(OsRng);
         let b_v = C::Curve::random(OsRng);
-        let c_v = a_v + b_v;
-        let d_v = a_v + a_v;
-        let e_v = a_v + b_v + a_v;
         let s_v = C::Scalar::random(OsRng);
         let s_v = Integer::from_fe(s_v, ecc_chip.rns_scalar());
 
@@ -122,7 +119,7 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
             })
             .collect::<Result<_, Error>>()?;
 
-        let (a, a_0, b, c_0, d_0, e_0, s, pairs_assigned) = layouter.assign_region(
+        let (a, a_0, b, s, pairs_assigned) = layouter.assign_region(
             || "assign variables",
             |region| {
                 let ctx = &mut RegionCtx::new(region, 0);
@@ -135,9 +132,6 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
                 let a = &ecc_chip.assign_point(ctx, Value::known(a_v.into()))?;
                 let a_0 = &ecc_chip.assign_point(ctx, Value::known(a_v.into()))?;
                 let b = &ecc_chip.assign_point(ctx, Value::known(b_v.into()))?;
-                let c_0 = &ecc_chip.assign_point(ctx, Value::known(c_v.into()))?;
-                let d_0 = &ecc_chip.assign_point(ctx, Value::known(d_v.into()))?;
-                let e_0 = &ecc_chip.assign_point(ctx, Value::known(e_v.into()))?;
                 let s = &ecc_chip.scalar_field_chip().assign_integer(
                     ctx,
                     Value::known(s_v.clone()).into(),
@@ -161,9 +155,6 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
                     a.clone(),
                     a_0.clone(),
                     b.clone(),
-                    c_0.clone(),
-                    d_0.clone(),
-                    e_0.clone(),
                     s.clone(),
                     pairs_assigned.clone(),
                 ))
