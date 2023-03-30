@@ -9,11 +9,11 @@ integer = { path = "../integer", default-features = false }
 ecc = { path = "../ecc", default-features = false }
 maingate = { path = "../maingate", default-features = false }
 
-#halo2ecc-s = { git = "https://github.com/DelphinusLab/halo2ecc-s" }
-#halo2_proofs_junyu = { package = "halo2_proofs", git = "https://github.com/junyu0312/halo2.git", branch = "gpu", default-features = true }
+halo2ecc-s = { git = "https://github.com/DelphinusLab/halo2ecc-s" }
+#halo2ecc-s = { path = "/home/volhovm/code/halo2ecc-s/", default-features = true }
 
-halo2ecc-s = { path = "/home/volhovm/code/halo2ecc-s/", default-features = true }
-halo2_proofs_junyu = { package = "halo2_proofs", path = "/home/volhovm/code/halo2-junyu/halo2_proofs/", default-features = true }
+#halo2_proofs_junyu = { package = "halo2_proofs", git = "https://github.com/junyu0312/halo2.git", branch = "gpu", default-features = true }
+halo2_proofs_junyu = { git = "https://github.com/volhovm/halo2", branch = "gpu", package = "halo2_proofs", default-features = true }
 
 num-bigint = { version = "0.4", features = ["rand"] }
 num-integer = "0.1"
