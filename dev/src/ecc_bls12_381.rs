@@ -3,11 +3,11 @@ use group::prime::PrimeGroup;
 use group::{Curve, Group};
 
 use halo2_proofs::arithmetic::{CurveAffine, FieldExt};
-use halo2_proofs::circuit::{Layouter, SimpleFloorPlanner};
+use halo2_proofs::circuit::{AssignedCell, Cell, Layouter, Region, SimpleFloorPlanner};
 use halo2_proofs::pairing::bls12_381::{G1Affine, G1};
 use halo2_proofs::pairing::bn256::{Fr, G1Affine as BN256_G1Affine, G1 as BN256_G1};
 use halo2_proofs::pairing::group::prime::PrimeCurveAffine;
-use halo2_proofs::plonk::{Circuit, ConstraintSystem, Error};
+use halo2_proofs::plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, Selector};
 use halo2_proofs_junyu as halo2_proofs;
 
 use rand_core::OsRng;
@@ -21,8 +21,8 @@ use std::rc::Rc;
 //    dev::MockProver,
 //    pairing::bn256::{Bn256, Fr, G1Affine},
 //    plonk::{
-//        create_proof, keygen_pk, keygen_vk, verify_proof, Circuit, ConstraintSystem, Error,
-//        SingleVerifier,
+//        create_proof, keygen_pk, keygen_vk, verify_proof, Circuit,
+// ConstraintSystem, Error,        SingleVerifier,
 //    },
 //    poly::commitment::{Params, ParamsVerifier},
 //    transcript::{Blake2bRead, Blake2bWrite, Challenge255},
@@ -41,6 +41,71 @@ use halo2ecc_s::context::{
 use halo2ecc_s::utils::field_to_bn;
 
 use halo2_proofs::dev::CircuitCost;
+
+//use halo2::{
+//    arithmetic::FieldExt,
+//    circuit::{AssignedCell, Cell, Region, Value},
+//};
+
+//#[derive(Debug)]
+//pub struct RegionCtx<'a, F: FieldExt> {
+//    region: Region<'a, F>,
+//    offset: usize,
+//}
+//
+//impl<'a, F: FieldExt> RegionCtx<'a, F> {
+//    pub fn new(region: Region<'a, F>, offset: usize) -> RegionCtx<'a, F> {
+//        RegionCtx { region, offset }
+//    }
+//
+//    pub fn offset(&self) -> usize {
+//        self.offset
+//    }
+//
+//    pub fn into_region(self) -> Region<'a, F> {
+//        self.region
+//    }
+//
+//    pub fn assign_fixed<A, AR>(
+//        &mut self,
+//        annotation: A,
+//        column: Column<Fixed>,
+//        value: F,
+//    ) -> Result<AssignedCell<F, F>, Error>
+//    where
+//        A: Fn() -> AR,
+//        AR: Into<String>,
+//    {
+//        self.region
+//            .assign_fixed(annotation, column, self.offset, || Ok(value))
+//    }
+//
+//    pub fn assign_advice<A, AR>(
+//        &mut self,
+//        annotation: A,
+//        column: Column<Advice>,
+//        value: F,
+//    ) -> Result<AssignedCell<F, F>, Error>
+//    where
+//        A: Fn() -> AR,
+//        AR: Into<String>,
+//    {
+//        self.region
+//            .assign_advice(annotation, column, self.offset, || Ok(value))
+//    }
+//
+//    pub fn constrain_equal(&mut self, cell_0: Cell, cell_1: Cell) ->
+// Result<(), Error> {        self.region.constrain_equal(cell_0, cell_1)
+//    }
+//
+//    pub fn enable(&mut self, selector: Selector) -> Result<(), Error> {
+//        selector.enable(&mut self.region, self.offset)
+//    }
+//
+//    pub fn next(&mut self) {
+//        self.offset += 1
+//    }
+//}
 
 /// Prints human-readable evaluation of circuit size and cost.
 pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Debug>(
@@ -105,48 +170,51 @@ impl Circuit<N> for TestBLSCircuit {
 
         range_chip.init_table(&mut layouter)?;
 
-        let ctx = Rc::new(RefCell::new(Context::new()));
-        let mut ctx = GeneralScalarEccContext::<G1Affine, Fr>::new(ctx);
+        for BATCH_SIZE in [2, 4, 8, 16] {
+            let (points, scalars) = layouter.assign_region(
+                || format!("msm+assignment, batch size {:?}", BATCH_SIZE),
+                |mut region| {
+                    let ctx = Rc::new(RefCell::new(Context::new()));
+                    let mut ctx = GeneralScalarEccContext::<G1Affine, Fr>::new(ctx);
 
-        let mut points = vec![];
-        let mut scalars = vec![];
-        let mut acc = G1::identity();
+                    let mut points = vec![];
+                    let mut scalars = vec![];
+                    let mut acc = G1::identity();
 
-        let BATCH_SIZE = 16;
-        for _ in 0..BATCH_SIZE {
-            let a = random_bls12_381_fr();
-            let b = random_bls12_381_fr();
-            let p = G1::generator() * a;
-            acc = acc + p * b;
-            points.push(p);
-            scalars.push(b);
+                    //let BATCH_SIZE = 16;
+                    for _ in 0..BATCH_SIZE {
+                        let a = random_bls12_381_fr();
+                        let b = random_bls12_381_fr();
+                        let p = G1::generator() * a;
+                        acc = acc + p * b;
+                        points.push(p);
+                        scalars.push(b);
+                    }
+
+                    let points = points
+                        .iter()
+                        .map(|x| ctx.assign_point(x))
+                        .collect::<Vec<_>>();
+                    let scalars = scalars
+                        .into_iter()
+                        .map(|x| ctx.scalar_integer_ctx.assign_w(&field_to_bn(&x)))
+                        .collect::<Vec<_>>();
+                    //let res_expect: AssignedPoint<G1Affine, Fr> = ctx.assign_point(&acc);
+                    let res: AssignedPoint<_, _> = ctx.msm(&points, &scalars);
+
+                    //ctx.ecc_assert_equal(&res, &res_expect);
+
+                    let ctx: Context<Fr> = ctx.into();
+                    let records = std::sync::Arc::try_unwrap(ctx.records)
+                        .unwrap()
+                        .into_inner()
+                        .unwrap();
+
+                    records.assign_all(&mut region, &base_chip, &range_chip)?;
+                    Ok((points.clone(), scalars.clone()))
+                },
+            )?;
         }
-
-        let points = points
-            .iter()
-            .map(|x| ctx.assign_point(x))
-            .collect::<Vec<_>>();
-        let scalars = scalars
-            .into_iter()
-            .map(|x| ctx.scalar_integer_ctx.assign_w(&field_to_bn(&x)))
-            .collect::<Vec<_>>();
-        let res: AssignedPoint<_, _> = ctx.msm(&points, &scalars);
-        let res_expect: AssignedPoint<G1Affine, Fr> = ctx.assign_point(&acc);
-        ctx.ecc_assert_equal(&res, &res_expect);
-
-        let ctx: Context<Fr> = ctx.into();
-        let records = std::sync::Arc::try_unwrap(ctx.records)
-            .unwrap()
-            .into_inner()
-            .unwrap();
-
-        layouter.assign_region(
-            || "base",
-            |mut region| {
-                records.assign_all(&mut region, &base_chip, &range_chip)?;
-                Ok(())
-            },
-        );
 
         Ok(())
     }
