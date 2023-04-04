@@ -9,7 +9,8 @@ num-bigint = { version = "0.4", features = ["rand"] }
 num-integer = "0.1"
 num-traits = "0.2"
 #halo2 = { package = "halo2_proofs", git = "https://github.com/privacy-scaling-explorations/halo2", tag = "v2023_02_02" }
-halo2 = { package = "halo2_proofs", path = "/home/volhovm/code/halo2-privacy-scaling-explorations/halo2_proofs/"}
+halo2 = { package = "halo2_proofs", git = "https://github.com/volhovm/halo2", branch = "volhovm/cost-model" }
+#halo2 = { package = "halo2_proofs", path = "/home/volhovm/code/halo2-privacy-scaling-explorations/halo2_proofs/"}
 group = "0.12"
 
 [dev-dependencies]
