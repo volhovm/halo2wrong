@@ -4,7 +4,7 @@ use group::{Curve, Group};
 
 use halo2_proofs::arithmetic::{CurveAffine, FieldExt};
 use halo2_proofs::circuit::{AssignedCell, Cell, Layouter, Region, SimpleFloorPlanner};
-use halo2_proofs::pairing::bls12_381::{G1Affine, G1};
+use halo2_proofs::pairing::bls12_381::{G1Affine, G2Affine, G1, G2};
 use halo2_proofs::pairing::bn256::{Fr, G1Affine as BN256_G1Affine, G1 as BN256_G1};
 use halo2_proofs::pairing::group::prime::PrimeCurveAffine;
 use halo2_proofs::plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, Selector};
@@ -15,25 +15,12 @@ use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-//use halo2::{
-//    arithmetic::{BaseExt},
-//    circuit::{Layouter, SimpleFloorPlanner},
-//    dev::MockProver,
-//    pairing::bn256::{Bn256, Fr, G1Affine},
-//    plonk::{
-//        create_proof, keygen_pk, keygen_vk, verify_proof, Circuit,
-// ConstraintSystem, Error,        SingleVerifier,
-//    },
-//    poly::commitment::{Params, ParamsVerifier},
-//    transcript::{Blake2bRead, Blake2bWrite, Challenge255},
-//};
-//use rand::{rngs::OsRng, SeedableRng};
-//use rand_xorshift::XorShiftRng;
-
-use halo2ecc_s::assign::AssignedPoint;
+use halo2ecc_s::assign::{AssignedCondition, AssignedG2Affine, AssignedPoint};
 use halo2ecc_s::circuit::base_chip::{BaseChip, BaseChipConfig, BaseChipOps};
 use halo2ecc_s::circuit::ecc_chip::{EccChipBaseOps, EccChipScalarOps};
+use halo2ecc_s::circuit::fq12::{Fq12ChipOps, Fq2ChipOps};
 use halo2ecc_s::circuit::integer_chip::IntegerChipOps;
+use halo2ecc_s::circuit::pairing_chip::PairingChipOps;
 use halo2ecc_s::circuit::range_chip::{RangeChip, RangeChipConfig};
 use halo2ecc_s::context::{
     Context, GeneralScalarEccContext, IntegerContext, NativeScalarEccContext, Records,
@@ -216,11 +203,74 @@ impl Circuit<N> for TestBLSCircuit {
             )?;
         }
 
+        layouter.assign_region(
+            || "Pairing",
+            |mut region| {
+                use halo2_proofs::pairing::bls12_381::pairing;
+
+                let ctx = Rc::new(RefCell::new(Context::new()));
+                let mut ctx = GeneralScalarEccContext::<G1Affine, Fr>::new(ctx);
+
+                let a = G1::random(&mut OsRng).into();
+                let b = G2Affine::from(G2::random(&mut OsRng));
+                let c = G1::random(&mut OsRng).into();
+                let d = G2Affine::from(G2::random(&mut OsRng));
+
+                let ab = pairing(&a, &b);
+                let cd = pairing(&c, &d);
+
+                let abcd = ab + cd;
+
+                let bx = ctx.fq2_assign_constant((b.x.c0, b.x.c1));
+                let by = ctx.fq2_assign_constant((b.y.c0, b.y.c1));
+                let b = AssignedG2Affine::new(
+                    bx,
+                    by,
+                    AssignedCondition(ctx.native_ctx.borrow_mut().assign_constant(Fr::zero())),
+                );
+
+                let dx = ctx.fq2_assign_constant((d.x.c0, d.x.c1));
+                let dy = ctx.fq2_assign_constant((d.y.c0, d.y.c1));
+                let d = AssignedG2Affine::new(
+                    dx,
+                    dy,
+                    AssignedCondition(ctx.native_ctx.borrow_mut().assign_constant(Fr::zero())),
+                );
+
+                let abcd0 = ctx.fq12_assign_constant((
+                    (
+                        (abcd.0.c0.c0.c0, abcd.0.c0.c0.c1),
+                        (abcd.0.c0.c1.c0, abcd.0.c0.c1.c1),
+                        (abcd.0.c0.c2.c0, abcd.0.c0.c2.c1),
+                    ),
+                    (
+                        (abcd.0.c1.c0.c0, abcd.0.c1.c0.c1),
+                        (abcd.0.c1.c1.c0, abcd.0.c1.c1.c1),
+                        (abcd.0.c1.c2.c0, abcd.0.c1.c2.c1),
+                    ),
+                ));
+
+                let a = ctx.assign_point(&a.to_curve());
+                let c = ctx.assign_point(&c.to_curve());
+
+                let abcd1 = ctx.pairing(&[(&a, &b), (&c, &d)]);
+
+                let ctx: Context<Fr> = ctx.into();
+                let records = std::sync::Arc::try_unwrap(ctx.records)
+                    .unwrap()
+                    .into_inner()
+                    .unwrap();
+
+                records.assign_all(&mut region, &base_chip, &range_chip)?;
+                Ok(())
+            },
+        );
+
         Ok(())
     }
 }
 
 pub fn measure_ecc_bls12_circuits() {
     let circuit = TestBLSCircuit {};
-    measure_circuit_size::<BN256_G1, _>(&circuit, 20);
+    measure_circuit_size::<BN256_G1, _>(&circuit, 22);
 }
