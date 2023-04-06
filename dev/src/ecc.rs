@@ -109,7 +109,7 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let s_v = C::Scalar::random(OsRng);
         let s_v = Integer::from_fe(s_v, ecc_chip.rns_scalar());
 
-        let number_of_pairs = 4;
+        let number_of_pairs = 16;
         let batch_pairs: Vec<_> = (0..number_of_pairs)
             .map(|_| {
                 let base = C::Curve::random(OsRng);
@@ -217,48 +217,47 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
             },
         )?;
 
-        let max_window_size = 4;
-        for window_size in 1..(max_window_size + 1) {
-            layouter.assign_region(
-                || format!("mul pre-assign windows {}", window_size),
-                |region| {
-                    let ctx = &mut RegionCtx::new(region, 0);
-                    ecc_chip.assign_aux(ctx, window_size, 1)?;
-                    Ok(())
-                },
-            )?;
-            layouter.assign_region(
-                || format!("mul window {}", window_size),
-                |region| {
-                    let ctx = &mut RegionCtx::new(region, 0);
-                    let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
-                    Ok(())
-                },
-            )?;
-        }
+        // 3 is optimal with common parameters.
+        let window_size = 3;
+        layouter.assign_region(
+            || format!("mul pre-assign windows {}", window_size),
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+                ecc_chip.assign_aux(ctx, window_size, 1)?;
+                Ok(())
+            },
+        )?;
+        layouter.assign_region(
+            || format!("mul window {}", window_size),
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+                Ok(())
+            },
+        )?;
 
-        for window_size in 1..(max_window_size + 1) {
+        for batch_size in [2, 4, 8, 16] {
             layouter.assign_region(
                 || {
                     format!(
-                        "batch mul pre-assign pairs {} windows {}",
-                        number_of_pairs, window_size
+                        "batch mul pre-assign pairs {} window {}",
+                        batch_size, window_size
                     )
                 },
                 |region| {
                     let ctx = &mut RegionCtx::new(region, 0);
-                    ecc_chip.assign_aux(ctx, window_size, number_of_pairs)?;
+                    ecc_chip.assign_aux(ctx, window_size, batch_size)?;
                     Ok(())
                 },
             )?;
 
             layouter.assign_region(
-                || format!("batch mul window {}", window_size),
+                || format!("batch size {} mul window {}", batch_size, window_size),
                 |region| {
                     let ctx = &mut RegionCtx::new(region, 0);
                     let _res = ecc_chip.mul_batch_1d_horizontal(
                         ctx,
-                        pairs_assigned.clone(),
+                        (&pairs_assigned.as_slice())[0..batch_size].to_vec(),
                         window_size,
                     )?;
                     Ok(())
@@ -294,18 +293,18 @@ pub fn measure_ecc_circuits() {
     let k = 25;
 
     measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    measure_addition::<PastaEp, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEp, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
 
-    measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    measure_addition::<PastaEq, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEq, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
 
-    measure_addition::<PastaEp, Bn256, 4, 72>(k);
-    measure_addition::<PastaEp, Secp256k1, 4, 72>(k);
-    measure_addition::<PastaEp, Pallas, 4, 72>(k);
+    //measure_addition::<PastaEp, Bn256, 4, 72>(k);
+    //measure_addition::<PastaEp, Secp256k1, 4, 72>(k);
+    //measure_addition::<PastaEp, Pallas, 4, 72>(k);
 
-    measure_addition::<PastaEq, Bn256, 4, 72>(k);
-    measure_addition::<PastaEq, Secp256k1, 4, 72>(k);
-    measure_addition::<PastaEq, Vesta, 4, 72>(k);
+    //measure_addition::<PastaEq, Bn256, 4, 72>(k);
+    //measure_addition::<PastaEq, Secp256k1, 4, 72>(k);
+    //measure_addition::<PastaEq, Vesta, 4, 72>(k);
 }
