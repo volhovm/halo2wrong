@@ -1,18 +1,17 @@
 use group::ff::Field;
 use group::prime::PrimeGroup;
-use group::{Curve, Group};
+use group::Group;
 
-use halo2_proofs::arithmetic::{CurveAffine, FieldExt};
-use halo2_proofs::circuit::{AssignedCell, Cell, Layouter, Region, SimpleFloorPlanner};
+use halo2_proofs::arithmetic::FieldExt;
+use halo2_proofs::circuit::{Layouter, SimpleFloorPlanner};
 use halo2_proofs::pairing::bls12_381::{G1Affine, G2Affine, G1, G2};
 use halo2_proofs::pairing::bn256::{Fr, G1Affine as BN256_G1Affine, G1 as BN256_G1};
 use halo2_proofs::pairing::group::prime::PrimeCurveAffine;
-use halo2_proofs::plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, Selector};
+use halo2_proofs::plonk::{Circuit, ConstraintSystem, Error};
 use halo2_proofs_junyu as halo2_proofs;
 
 use rand_core::OsRng;
 use std::cell::RefCell;
-use std::marker::PhantomData;
 use std::rc::Rc;
 
 use halo2ecc_s::assign::{AssignedCondition, AssignedG2Affine, AssignedPoint};
@@ -22,9 +21,7 @@ use halo2ecc_s::circuit::fq12::{Fq12ChipOps, Fq2ChipOps};
 use halo2ecc_s::circuit::integer_chip::IntegerChipOps;
 use halo2ecc_s::circuit::pairing_chip::PairingChipOps;
 use halo2ecc_s::circuit::range_chip::{RangeChip, RangeChipConfig};
-use halo2ecc_s::context::{
-    Context, GeneralScalarEccContext, IntegerContext, NativeScalarEccContext, Records,
-};
+use halo2ecc_s::context::{Context, GeneralScalarEccContext};
 use halo2ecc_s::utils::field_to_bn;
 
 use halo2_proofs::dev::CircuitCost;

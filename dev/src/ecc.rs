@@ -236,34 +236,34 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
             },
         )?;
 
-        for batch_size in [2, 4, 8, 16] {
-            layouter.assign_region(
-                || {
-                    format!(
-                        "batch mul pre-assign pairs {} window {}",
-                        batch_size, window_size
-                    )
-                },
-                |region| {
-                    let ctx = &mut RegionCtx::new(region, 0);
-                    ecc_chip.assign_aux(ctx, window_size, batch_size)?;
-                    Ok(())
-                },
-            )?;
+        //for batch_size in [2, 4, 8, 16] {
+        //    layouter.assign_region(
+        //        || {
+        //            format!(
+        //                "batch mul pre-assign pairs {} window {}",
+        //                batch_size, window_size
+        //            )
+        //        },
+        //        |region| {
+        //            let ctx = &mut RegionCtx::new(region, 0);
+        //            ecc_chip.assign_aux(ctx, window_size, batch_size)?;
+        //            Ok(())
+        //        },
+        //    )?;
 
-            layouter.assign_region(
-                || format!("batch size {} mul window {}", batch_size, window_size),
-                |region| {
-                    let ctx = &mut RegionCtx::new(region, 0);
-                    let _res = ecc_chip.mul_batch_1d_horizontal(
-                        ctx,
-                        (&pairs_assigned.as_slice())[0..batch_size].to_vec(),
-                        window_size,
-                    )?;
-                    Ok(())
-                },
-            )?;
-        }
+        //    layouter.assign_region(
+        //        || format!("batch size {} mul window {}", batch_size, window_size),
+        //        |region| {
+        //            let ctx = &mut RegionCtx::new(region, 0);
+        //            let _res = ecc_chip.mul_batch_1d_horizontal(
+        //                ctx,
+        //                (&pairs_assigned.as_slice())[0..batch_size].to_vec(),
+        //                window_size,
+        //            )?;
+        //            Ok(())
+        //        },
+        //    )?;
+        //}
 
         config.config_range(&mut layouter)?;
 
@@ -290,7 +290,7 @@ pub fn measure_ecc_circuits() {
 
     use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq};
 
-    let k = 25;
+    let k = 20;
 
     measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
     //measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
