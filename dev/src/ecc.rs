@@ -17,7 +17,7 @@ use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructio
 use rand_core::OsRng;
 use std::marker::PhantomData;
 
-use crate::util::measure_circuit_size;
+use crate::util::{measure_circuit_size, Estimator};
 
 const NUMBER_OF_LIMBS: usize = 4;
 const BIT_LEN_LIMB: usize = 68;
@@ -109,7 +109,7 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let s_v = C::Scalar::random(OsRng);
         let s_v = Integer::from_fe(s_v, ecc_chip.rns_scalar());
 
-        let number_of_pairs = 16;
+        let number_of_pairs = 1;
         let batch_pairs: Vec<_> = (0..number_of_pairs)
             .map(|_| {
                 let base = C::Curve::random(OsRng);
@@ -227,14 +227,14 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
                 Ok(())
             },
         )?;
-        layouter.assign_region(
-            || format!("mul window {}", window_size),
-            |region| {
-                let ctx = &mut RegionCtx::new(region, 0);
-                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
-                Ok(())
-            },
-        )?;
+        //layouter.assign_region(
+        //    || format!("mul window {}", window_size),
+        //    |region| {
+        //        let ctx = &mut RegionCtx::new(region, 0);
+        //        let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+        //        Ok(())
+        //    },
+        //)?;
 
         //for batch_size in [2, 4, 8, 16] {
         //    layouter.assign_region(
@@ -272,12 +272,16 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 }
 
 pub fn measure_ecc_circuits() {
+    let k = 17;
+    let e = &Estimator::random(k as usize);
+
     fn measure_addition<
         G: PrimeGroup,
         C: CurveAffine,
         const NUMBER_OF_LIMBS: usize,
         const BIT_LEN_LIMB: usize,
     >(
+        estimator: &Estimator,
         k: u32,
     ) where
         <G as group::Group>::Scalar: FieldExt,
@@ -285,26 +289,24 @@ pub fn measure_ecc_circuits() {
         let circuit =
             EccEvaluation::<C, <G as group::Group>::Scalar, NUMBER_OF_LIMBS, BIT_LEN_LIMB>::default(
             );
-        measure_circuit_size::<G, _>(&circuit, k);
+        measure_circuit_size::<G, _>(&circuit, k, &estimator);
     }
 
     use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq};
 
-    let k = 20;
+    measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure_addition::<PastaEp, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
 
-    measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    //measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    //measure_addition::<PastaEp, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure_addition::<PastaEq, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
 
-    //measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    //measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
-    //measure_addition::<PastaEq, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_addition::<PastaEp, Bn256, 4, 72>(e,k);
+    //measure_addition::<PastaEp, Secp256k1, 4, 72>(e,k);
+    //measure_addition::<PastaEp, Pallas, 4, 72>(e,k);
 
-    //measure_addition::<PastaEp, Bn256, 4, 72>(k);
-    //measure_addition::<PastaEp, Secp256k1, 4, 72>(k);
-    //measure_addition::<PastaEp, Pallas, 4, 72>(k);
-
-    //measure_addition::<PastaEq, Bn256, 4, 72>(k);
-    //measure_addition::<PastaEq, Secp256k1, 4, 72>(k);
-    //measure_addition::<PastaEq, Vesta, 4, 72>(k);
+    //measure_addition::<PastaEq, Bn256, 4, 72>(e,k);
+    //measure_addition::<PastaEq, Secp256k1, 4, 72>(e,k);
+    //measure_addition::<PastaEq, Vesta, 4, 72>(e,k);
 }

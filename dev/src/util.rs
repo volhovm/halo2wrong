@@ -13,33 +13,7 @@ use maingate::halo2::dev::CircuitCost;
 use maingate::halo2::halo2curves::pasta::pallas;
 use maingate::halo2::plonk::Circuit;
 
-/// Prints human-readable evaluation of circuit size and cost.
-pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Debug>(
-    circuit: &C,
-    k: u32,
-) where
-    G::Scalar: FieldExt,
-{
-    //println!("{:?}", circuit);
-    println!("{}", std::any::type_name::<C>());
-    let cost: CircuitCost<_, _> = CircuitCost::<G, C>::measure(k, circuit);
-    for (region, value) in &cost.regions {
-        println!("  {}: {}", region, value);
-    }
-    println!("Cost: {:?}", &cost);
-    println!("Verification time: {:?}", measure_verification_time(&cost));
-
-    let proof_size = cost.proof_size(1);
-    println!("Proof size: {:?}", proof_size);
-
-    //    println!("{:?}", cost.marginal_proof_size());
-    //
-    //    //println!("min rows: {}", circuit.minimum_rows());
-    //    let dimension = DimensionMeasurement::measure(circuit).unwrap();
-    //    println!("{:?}", dimension);
-}
-
-struct Estimator {
+pub struct Estimator {
     /// Scalars for estimating multiexp performance.
     multiexp_scalars: Vec<pallas::Scalar>,
     /// Bases for estimating multiexp performance.
@@ -53,9 +27,12 @@ impl fmt::Debug for Estimator {
 }
 
 impl Estimator {
-    fn random(k: usize) -> Self {
+    pub fn random(k: usize) -> Self {
         let max_size = 1 << (k + 1);
+        //let max_size = 1 << k;
         let mut rng = rand_core::OsRng;
+
+        println!("Generating {} points for the estimator", 2 * max_size);
 
         Estimator {
             multiexp_scalars: (0..max_size)
@@ -68,10 +45,41 @@ impl Estimator {
     }
 
     fn multiexp(&self, size: usize) -> Duration {
+        println!("Estimating {} multiexps...", size);
         let start = Instant::now();
         best_multiexp(&self.multiexp_scalars[..size], &self.multiexp_bases[..size]);
         Instant::now().duration_since(start)
     }
+}
+
+/// Prints human-readable evaluation of circuit size and cost.
+pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Debug>(
+    circuit: &C,
+    k: u32,
+    estimator: &Estimator,
+) where
+    G::Scalar: FieldExt,
+{
+    //println!("{:?}", circuit);
+    println!("{}", std::any::type_name::<C>());
+    let cost: CircuitCost<_, _> = CircuitCost::<G, C>::measure(k, circuit);
+    for (region, value) in &cost.regions {
+        println!("  {}: {}", region, value);
+    }
+    println!("Cost: {:?}", &cost);
+    println!(
+        "Verification time: {:?}",
+        measure_verification_time(&cost, estimator)
+    );
+
+    let proof_size = cost.proof_size(1);
+    println!("Proof size: {:?}", proof_size);
+
+    //    println!("{:?}", cost.marginal_proof_size());
+    //
+    //    //println!("min rows: {}", circuit.minimum_rows());
+    //    let dimension = DimensionMeasurement::measure(circuit).unwrap();
+    //    println!("{:?}", dimension);
 }
 
 pub fn measure_proof_size<G: PrimeGroup, C: Circuit<G::Scalar>>(cost: &CircuitCost<G, C>) -> usize {
@@ -116,6 +124,7 @@ pub fn measure_proof_size<G: PrimeGroup, C: Circuit<G::Scalar>>(cost: &CircuitCo
 
 fn measure_verification_time<G: PrimeGroup, C: Circuit<G::Scalar>>(
     cost: &CircuitCost<G, C>,
+    estimator: &Estimator,
 ) -> Duration {
     println!("estimating verificaiton time...");
     // TODO: Estimate cost of BLAKE2b.
@@ -133,6 +142,5 @@ fn measure_verification_time<G: PrimeGroup, C: Circuit<G::Scalar>>(
     // - U
     let polycomm = 1 + (2 * cost.k) + 1 + 1;
 
-    let estimator = Estimator::random(cost.k as usize);
     estimator.multiexp((g_scalars + multiopen + (polycomm as usize)) as usize)
 }
