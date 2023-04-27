@@ -17,7 +17,7 @@ use maingate::{MainGate, MainGateConfig, RangeChip, RangeConfig, RangeInstructio
 use rand_core::OsRng;
 use std::marker::PhantomData;
 
-use crate::util::{measure_circuit_size, Estimator};
+use crate::util::{measure_circuit_real, measure_circuit_size, Estimator};
 
 const NUMBER_OF_LIMBS: usize = 4;
 const BIT_LEN_LIMB: usize = 68;
@@ -87,7 +87,9 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
     type FloorPlanner = SimpleFloorPlanner;
 
     fn without_witnesses(&self) -> Self {
-        unimplemented!()
+        EccEvaluation {
+            _marker: self._marker,
+        }
     }
 
     fn configure(meta: &mut ConstraintSystem<N>) -> Self::Config {
@@ -227,14 +229,22 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
                 Ok(())
             },
         )?;
-        //layouter.assign_region(
-        //    || format!("mul window {}", window_size),
-        //    |region| {
-        //        let ctx = &mut RegionCtx::new(region, 0);
-        //        let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
-        //        Ok(())
-        //    },
-        //)?;
+        layouter.assign_region(
+            || format!("mul window {}", window_size),
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+                Ok(())
+            },
+        )?;
+        layouter.assign_region(
+            || format!("mul 2 window {}", window_size),
+            |region| {
+                let ctx = &mut RegionCtx::new(region, 0);
+                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+                Ok(())
+            },
+        )?;
 
         //for batch_size in [2, 4, 8, 16] {
         //    layouter.assign_region(
@@ -272,10 +282,11 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 }
 
 pub fn measure_ecc_circuits() {
-    let k = 17;
-    let e = &Estimator::random(k as usize);
+    use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq, Fp as PastaFp};
 
-    fn measure_addition<
+    let k = 18;
+
+    fn measure<
         G: PrimeGroup,
         C: CurveAffine,
         const NUMBER_OF_LIMBS: usize,
@@ -292,21 +303,30 @@ pub fn measure_ecc_circuits() {
         measure_circuit_size::<G, _>(&circuit, k, &estimator);
     }
 
-    use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq};
+    fn measure_full<C: CurveAffine, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LIMB: usize>(
+        k: u32,
+    ) {
+        let circuit = EccEvaluation::<C, PastaFp, NUMBER_OF_LIMBS, BIT_LEN_LIMB>::default();
+        measure_circuit_real(circuit, k);
+    }
 
-    measure_addition::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
-    measure_addition::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
-    measure_addition::<PastaEp, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure_full::<Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
 
-    measure_addition::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
-    measure_addition::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
-    measure_addition::<PastaEq, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    let e = &Estimator::random(k as usize);
 
-    //measure_addition::<PastaEp, Bn256, 4, 72>(e,k);
-    //measure_addition::<PastaEp, Secp256k1, 4, 72>(e,k);
-    //measure_addition::<PastaEp, Pallas, 4, 72>(e,k);
+    measure::<PastaEp, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure::<PastaEp, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure::<PastaEp, Vesta, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
 
-    //measure_addition::<PastaEq, Bn256, 4, 72>(e,k);
-    //measure_addition::<PastaEq, Secp256k1, 4, 72>(e,k);
-    //measure_addition::<PastaEq, Vesta, 4, 72>(e,k);
+    measure::<PastaEq, Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure::<PastaEq, Secp256k1, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+    measure::<PastaEq, Pallas, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(e, k);
+
+    //measure::<PastaEp, Bn256, 4, 72>(e,k);
+    //measure::<PastaEp, Secp256k1, 4, 72>(e,k);
+    //measure::<PastaEp, Pallas, 4, 72>(e,k);
+
+    //measure::<PastaEq, Bn256, 4, 72>(e,k);
+    //measure::<PastaEq, Secp256k1, 4, 72>(e,k);
+    //measure::<PastaEq, Vesta, 4, 72>(e,k);
 }

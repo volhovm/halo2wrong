@@ -11,6 +11,7 @@ use group::{Curve, Group};
 use maingate::halo2::arithmetic::{best_multiexp, FieldExt};
 use maingate::halo2::dev::CircuitCost;
 use maingate::halo2::halo2curves::pasta::pallas;
+use maingate::halo2::halo2curves::pasta::Fp as PastaFp;
 use maingate::halo2::plonk::Circuit;
 
 pub struct Estimator {
@@ -75,11 +76,87 @@ pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Deb
     let proof_size = cost.proof_size(1);
     println!("Proof size: {:?}", proof_size);
 
+    //    verifier_group.bench_with_input(
+    //        BenchmarkId::from_parameter(k),
+    //        &(&params, pk.get_vk(), &proof[..]),
+    //        |b, &(params, vk, proof)| {
+    //            b.iter(|| verifier(params, vk, proof));
+    //        },
+    //    );
+
     //    println!("{:?}", cost.marginal_proof_size());
     //
     //    //println!("min rows: {}", circuit.minimum_rows());
     //    let dimension = DimensionMeasurement::measure(circuit).unwrap();
     //    println!("{:?}", dimension);
+}
+
+pub fn measure_circuit_real<C: Circuit<PastaFp> + std::fmt::Debug>(circuit: C, k: u32) {
+    use maingate::halo2::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
+    use maingate::halo2::halo2curves::pasta::{EqAffine, Fp};
+    use maingate::halo2::plonk::*;
+    use maingate::halo2::poly::{commitment::ParamsProver, Rotation};
+    use maingate::halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255};
+    use maingate::halo2::{
+        poly::{
+            ipa::{
+                commitment::{IPACommitmentScheme, ParamsIPA},
+                multiopen::ProverIPA,
+                strategy::SingleStrategy,
+            },
+            VerificationStrategy,
+        },
+        transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
+    };
+    use rand_core::OsRng;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    let t_1 = SystemTime::now();
+
+    println!("generating keys");
+    let params: ParamsIPA<EqAffine> = ParamsIPA::new(k);
+    let circuit_empty = circuit.without_witnesses();
+    let vk = keygen_vk(&params, &circuit_empty).expect("keygen_vk should not fail");
+    let pk = keygen_pk(&params, vk, &circuit_empty).expect("keygen_pk should not fail");
+
+    let t_2 = SystemTime::now();
+
+    println!("generating proof");
+    let mut transcript = Blake2bWrite::<_, _, Challenge255<EqAffine>>::init(vec![]);
+    create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
+        &params,
+        &pk,
+        &[circuit],
+        &[&[&[]]],
+        OsRng,
+        &mut transcript,
+    )
+    .expect("proof generation should not fail");
+    let proof = transcript.finalize();
+
+    let t_3 = SystemTime::now();
+
+    println!("verifying proof");
+    let strategy = SingleStrategy::new(&params);
+    let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
+    let res = verify_proof(&params, pk.get_vk(), strategy, &[&[&[]]], &mut transcript).is_ok();
+
+    let t_4 = SystemTime::now();
+
+    println!("verification res: {}", res);
+
+    let t_delta1 = t_2.duration_since(t_1).unwrap();
+    let t_delta2 = t_3.duration_since(t_2).unwrap();
+    let t_delta3 = t_4.duration_since(t_3).unwrap();
+    let t_total = t_4.duration_since(t_1).unwrap();
+
+    println!(
+        "Circuit time (total {:?}):
+  keygen    {:?}
+  prove     {:?}
+  verify    {:?}",
+        t_total, t_delta1, t_delta2, t_delta3
+    );
 }
 
 pub fn measure_proof_size<G: PrimeGroup, C: Circuit<G::Scalar>>(cost: &CircuitCost<G, C>) -> usize {
