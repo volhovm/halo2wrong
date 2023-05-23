@@ -68,7 +68,7 @@ pub fn simple_msm_estimator() {
     use maingate::halo2::multicore::ThreadPoolBuilder;
 
     let threads = 1;
-    let k = 15;
+    let k = 17;
 
     ThreadPoolBuilder::new()
         .num_threads(threads)
@@ -77,8 +77,8 @@ pub fn simple_msm_estimator() {
     let e = &Estimator::random(k as usize);
     let duration = e.multiexp(1 << k);
     println!(
-        "Running 2^{} multiexp with {} threads takes {:?}",
-        k, threads, duration
+        "Running 2^{}={} multiexp with {} threads takes {:?}",
+        k, 1<<k, threads, duration
     );
 }
 
