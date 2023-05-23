@@ -56,12 +56,30 @@ impl Estimator {
         }
     }
 
-    fn multiexp(&self, size: usize) -> Duration {
+    pub fn multiexp(&self, size: usize) -> Duration {
         println!("Estimating {} multiexps...", size);
         let start = Instant::now();
         best_multiexp(&self.multiexp_scalars[..size], &self.multiexp_bases[..size]);
         Instant::now().duration_since(start)
     }
+}
+
+pub fn simple_msm_estimator() {
+    use maingate::halo2::multicore::ThreadPoolBuilder;
+
+    let threads = 1;
+    let k = 15;
+
+    ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build_global()
+        .unwrap();
+    let e = &Estimator::random(k as usize);
+    let duration = e.multiexp(1 << k);
+    println!(
+        "Running 2^{} multiexp with {} threads takes {:?}",
+        k, threads, duration
+    );
 }
 
 /// Prints human-readable evaluation of circuit size and cost.
