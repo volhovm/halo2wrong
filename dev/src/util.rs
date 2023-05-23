@@ -35,13 +35,24 @@ impl Estimator {
 
         println!("Generating {} points for the estimator", 2 * max_size);
 
-        Estimator {
-            multiexp_scalars: (0..max_size)
+        let thread1 = std::thread::spawn(move || {
+            (0..max_size)
                 .map(|_| pallas::Scalar::random(&mut rng))
-                .collect(),
-            multiexp_bases: (0..max_size)
+                .collect()
+        });
+
+        let thread2 = std::thread::spawn(move || {
+            (0..max_size)
                 .map(|_| pallas::Point::random(&mut rng).to_affine())
-                .collect(),
+                .collect()
+        });
+
+        let multiexp_scalars = thread1.join().unwrap();
+        let multiexp_bases = thread2.join().unwrap();
+
+        Estimator {
+            multiexp_scalars,
+            multiexp_bases,
         }
     }
 
@@ -94,9 +105,11 @@ pub fn measure_circuit_size<G: PrimeGroup, C: Circuit<G::Scalar> + std::fmt::Deb
 pub fn measure_circuit_real<C: Circuit<PastaFp> + std::fmt::Debug>(circuit: C, k: u32) {
     use maingate::halo2::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
     use maingate::halo2::halo2curves::pasta::{EqAffine, Fp};
+    use maingate::halo2::multicore::ThreadPoolBuilder;
     use maingate::halo2::plonk::*;
     use maingate::halo2::poly::{commitment::ParamsProver, Rotation};
     use maingate::halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255};
+    use maingate::halo2::SerdeFormat;
     use maingate::halo2::{
         poly::{
             ipa::{
@@ -109,17 +122,40 @@ pub fn measure_circuit_real<C: Circuit<PastaFp> + std::fmt::Debug>(circuit: C, k
         transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
     };
     use rand_core::OsRng;
+    use std::fs::File;
+    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let t_1 = SystemTime::now();
 
-    println!("generating keys");
     let params: ParamsIPA<EqAffine> = ParamsIPA::new(k);
     let circuit_empty = circuit.without_witnesses();
+    println!("generating keys");
+    //let (vk, pk) = if !Path::new("plonk_vk.raw").exists() {
+    //    let vk_file = File::create("plonk_vk.raw").unwrap();
+    //    let pk_file = File::create("plonk_pk.raw").unwrap();
+    //    let vk = keygen_vk(&params, &circuit_empty).expect("keygen_vk should not
+    // fail");    let pk = keygen_pk(&params, vk,
+    // &circuit_empty).expect("keygen_pk should not fail");
+    //    vk.write(SerdeFormat::Processed);
+    //    pk.write(SerdeFormat::Processed);
+    //    (vk, pk)
+    //} else {
+    //    let mut vk_file = File::open("plonk_vk.raw").unwrap();
+    //    let vk = VerifyingKey::read(&mut vk_file, SerdeFormat::Processed);
+    //    let mut pk_file = File::open("plonk_pk.raw").unwrap();
+    //    let pk = ProvingKey::read(&mut pk_file, SerdeFormat::Processed);
+    //    (vk, pk)
+    //};
     let vk = keygen_vk(&params, &circuit_empty).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk, &circuit_empty).expect("keygen_pk should not fail");
 
     let t_2 = SystemTime::now();
+
+    //ThreadPoolBuilder::new()
+    //    .num_threads(1)
+    //    .build_global()
+    //    .unwrap();
 
     println!("generating proof");
     let mut transcript = Blake2bWrite::<_, _, Challenge255<EqAffine>>::init(vec![]);

@@ -111,7 +111,7 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
         let s_v = C::Scalar::random(OsRng);
         let s_v = Integer::from_fe(s_v, ecc_chip.rns_scalar());
 
-        let number_of_pairs = 1;
+        let number_of_pairs = 2;
         let batch_pairs: Vec<_> = (0..number_of_pairs)
             .map(|_| {
                 let base = C::Curve::random(OsRng);
@@ -221,59 +221,61 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 
         // 3 is optimal with common parameters.
         let window_size = 3;
-        layouter.assign_region(
-            || format!("mul pre-assign windows {}", window_size),
-            |region| {
-                let ctx = &mut RegionCtx::new(region, 0);
-                ecc_chip.assign_aux(ctx, window_size, 1)?;
-                Ok(())
-            },
-        )?;
-        layouter.assign_region(
-            || format!("mul window {}", window_size),
-            |region| {
-                let ctx = &mut RegionCtx::new(region, 0);
-                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
-                Ok(())
-            },
-        )?;
-        layouter.assign_region(
-            || format!("mul 2 window {}", window_size),
-            |region| {
-                let ctx = &mut RegionCtx::new(region, 0);
-                let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
-                Ok(())
-            },
-        )?;
 
-        //for batch_size in [2, 4, 8, 16] {
-        //    layouter.assign_region(
-        //        || {
-        //            format!(
-        //                "batch mul pre-assign pairs {} window {}",
-        //                batch_size, window_size
-        //            )
-        //        },
-        //        |region| {
-        //            let ctx = &mut RegionCtx::new(region, 0);
-        //            ecc_chip.assign_aux(ctx, window_size, batch_size)?;
-        //            Ok(())
-        //        },
-        //    )?;
+        //layouter.assign_region(
+        //    || format!("mul pre-assign windows {}", window_size),
+        //    |region| {
+        //        let ctx = &mut RegionCtx::new(region, 0);
+        //        ecc_chip.assign_aux(ctx, window_size, 1)?;
+        //        Ok(())
+        //    },
+        //)?;
+        //layouter.assign_region(
+        //    || format!("mul window {}", window_size),
+        //    |region| {
+        //        let ctx = &mut RegionCtx::new(region, 0);
+        //        let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+        //        Ok(())
+        //    },
+        //)?;
+        //layouter.assign_region(
+        //    || format!("mul 2 window {}", window_size),
+        //    |region| {
+        //        let ctx = &mut RegionCtx::new(region, 0);
+        //        let _ret = ecc_chip.mul(ctx, &b, &s, window_size)?;
+        //        Ok(())
+        //    },
+        //)?;
 
-        //    layouter.assign_region(
-        //        || format!("batch size {} mul window {}", batch_size, window_size),
-        //        |region| {
-        //            let ctx = &mut RegionCtx::new(region, 0);
-        //            let _res = ecc_chip.mul_batch_1d_horizontal(
-        //                ctx,
-        //                (&pairs_assigned.as_slice())[0..batch_size].to_vec(),
-        //                window_size,
-        //            )?;
-        //            Ok(())
-        //        },
-        //    )?;
-        //}
+        for batch_size in [2] {
+            //for batch_size in [2, 4, 8, 16] {
+            layouter.assign_region(
+                || {
+                    format!(
+                        "batch mul pre-assign pairs {} window {}",
+                        batch_size, window_size
+                    )
+                },
+                |region| {
+                    let ctx = &mut RegionCtx::new(region, 0);
+                    ecc_chip.assign_aux(ctx, window_size, batch_size)?;
+                    Ok(())
+                },
+            )?;
+
+            layouter.assign_region(
+                || format!("batch size {} mul window {}", batch_size, window_size),
+                |region| {
+                    let ctx = &mut RegionCtx::new(region, 0);
+                    let _res = ecc_chip.mul_batch_1d_horizontal(
+                        ctx,
+                        (&pairs_assigned.as_slice())[0..batch_size].to_vec(),
+                        window_size,
+                    )?;
+                    Ok(())
+                },
+            )?;
+        }
 
         config.config_range(&mut layouter)?;
 
@@ -282,6 +284,12 @@ impl<C: CurveAffine, N: FieldExt, const NUMBER_OF_LIMBS: usize, const BIT_LEN_LI
 }
 
 pub fn measure_ecc_circuits() {
+    use maingate::halo2::multicore::ThreadPoolBuilder;
+    ThreadPoolBuilder::new()
+        .num_threads(4)
+        .build_global()
+        .unwrap();
+
     use halo2::halo2curves::pasta::{Ep as PastaEp, Eq as PastaEq, Fp as PastaFp};
 
     let k = 18;
@@ -310,7 +318,7 @@ pub fn measure_ecc_circuits() {
         measure_circuit_real(circuit, k);
     }
 
-    measure_full::<Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
+    //measure_full::<Bn256, NUMBER_OF_LIMBS, BIT_LEN_LIMB>(k);
 
     let e = &Estimator::random(k as usize);
 
